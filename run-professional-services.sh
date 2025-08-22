@@ -1,6 +1,6 @@
 #!/bin/bash
-# AWS Config Professional Services Portal - Master Client Interface (FIXED)
-# Usage: curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/run-professional-services.sh | bash CLIENT_CODE
+# AWS Config Professional Services Portal - Master Client Interface (COMPLETE FIXED VERSION)
+# Usage: curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/run-professional-services.sh | bash -s CLIENT_CODE
 
 # Professional color scheme
 readonly RED='\033[0;31m'
