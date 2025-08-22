@@ -1,5 +1,5 @@
 #!/bin/bash
-# AWS Config Professional Services Portal - Master Client Interface
+# AWS Config Professional Services Portal - Master Client Interface (FIXED)
 # Usage: curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/run-professional-services.sh | bash CLIENT_CODE
 
 # Professional color scheme
@@ -141,8 +141,8 @@ execute_intelligent_cleanup() {
     if [[ $confirm =~ ^[Yy]$ ]]; then
         print_success "Executing Intelligent Config Cleanup..."
         
-        # Download and execute the enhanced client service script
-        if curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/client-service.sh | bash "$CLIENT_CODE"; then
+        # FIXED: Download and execute the enhanced client service script with proper parameter passing
+        if curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/client-service.sh | bash -s "$CLIENT_CODE"; then
             print_success "Intelligent Cleanup service completed successfully!"
         else
             print_error "Service execution encountered issues"
@@ -175,8 +175,8 @@ execute_nist_deployment() {
     if [[ $confirm =~ ^[Yy]$ ]]; then
         print_success "Executing NIST 800-171 Deployment..."
         
-        # Download and execute the NIST deployment script
-        if curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/nist-deployment-service.sh | bash "$CLIENT_CODE" "$stack_name"; then
+        # FIXED: Download and execute the NIST deployment script with proper parameter passing
+        if curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/nist-deployment-service.sh | bash -s "$CLIENT_CODE" "$stack_name"; then
             print_success "NIST Deployment service completed successfully!"
         else
             print_error "Service execution encountered issues"
@@ -211,11 +211,13 @@ execute_complete_package() {
         print_success "Executing Complete Compliance Package..."
         
         print_info "Phase 1: Intelligent Config Cleanup"
-        if curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/client-service.sh | bash "$CLIENT_CODE"; then
+        # FIXED: Use proper parameter passing with -s flag
+        if curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/client-service.sh | bash -s "$CLIENT_CODE"; then
             print_success "Phase 1 completed successfully!"
             
             print_info "Phase 2: NIST 800-171 Deployment"
-            if curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/nist-deployment-service.sh | bash "$CLIENT_CODE" "$stack_name"; then
+            # FIXED: Use proper parameter passing with -s flag
+            if curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/nist-deployment-service.sh | bash -s "$CLIENT_CODE" "$stack_name"; then
                 print_success "Complete Package service completed successfully!"
                 print_success "🎉 Your AWS environment is now fully compliant and optimized!"
             else
@@ -263,8 +265,8 @@ execute_nuclear_cleanup() {
         if [ "$confirm2" = "NUCLEAR" ]; then
             print_warning "Executing Nuclear Cleanup with Backup..."
             
-            # Download and execute the nuclear cleanup script
-            if curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/nuclear-cleanup-service.sh | bash "$CLIENT_CODE"; then
+            # FIXED: Download and execute the nuclear cleanup script with proper parameter passing
+            if curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/nuclear-cleanup-service.sh | bash -s "$CLIENT_CODE"; then
                 print_success "Nuclear Cleanup service completed!"
                 print_warning "🛡️  Security monitoring is now OFFLINE"
                 print_info "📦 Backup available for restore if needed"
