@@ -20,9 +20,9 @@ echo "Service Date: $(date)"
 echo "Service Provider: AWS Config Cleanup Service"
 echo ""
 
-# Download NIST CloudFormation template
+# Download NIST CloudFormation template - FIXED PATH
 echo "📥 Downloading NIST 800-171 CloudFormation template..."
-curl -s -O https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/templates/nist-800-171-conformance-pack.yaml
+curl -s -O https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/templates/nist-800-171-conformance-pack.yaml
 
 if [ ! -f "nist-800-171-conformance-pack.yaml" ]; then
     echo "❌ Failed to download NIST template"
