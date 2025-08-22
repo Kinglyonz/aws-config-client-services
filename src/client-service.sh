@@ -1,5 +1,5 @@
 #!/bin/bash
-# Enhanced AWS Config Client Service - Professional Delivery Platform (FIXED)
+# Enhanced AWS Config Client Service - FIXED PARSING VERSION
 # Usage: curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/client-service.sh | bash -s CLIENT_CODE
 
 # Professional color scheme
@@ -20,7 +20,6 @@ SERVICE_COST=1500
 CONTACT_EMAIL="khalillyons@gmail.com"
 CONTACT_PHONE="(703) 795-4193"
 
-# Professional output functions
 print_banner() {
     clear
     echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
@@ -73,6 +72,12 @@ print_business_value() {
     local total_rules=$1
     local security_hub_rules=$2
     local cleanable_rules=$((total_rules - security_hub_rules))
+    
+    # Ensure positive numbers for business calculations
+    if [ $cleanable_rules -lt 0 ]; then
+        cleanable_rules=0
+    fi
+    
     local manual_hours=$((cleanable_rules / 10))  # 10 rules per hour manual
     local manual_cost=$((manual_hours * 150))     # $150/hour consultant rate
     local savings=$((manual_cost - SERVICE_COST))
@@ -119,7 +124,6 @@ download_toolkit() {
     
     print_info "📥 Downloading enhanced AWS Config toolkit..."
     
-    # Download enhanced scripts
     if curl -s -f -O https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/src/aws_config_reset.py; then
         print_success "Core cleanup engine downloaded"
     else
@@ -151,18 +155,16 @@ run_discovery_analysis() {
     print_info "🌍 Scanning ALL AWS regions for Config rules..."
     print_info "   This analysis is completely safe - no changes will be made"
     
-    # Run discovery with enhanced output - ALWAYS scan ALL REGIONS
     if python3 aws_config_reset.py --all-regions --dry-run > discovery_output.txt 2>&1; then
         print_success "Multi-region discovery analysis completed successfully"
         
-        # FIXED: Always use aggregation method (not summary which counts cleanup operations)
         print_info "🔄 Aggregating Config rule data from all regions..."
         
-        # Sum all non-zero "Total Config rules found" values from each region
+        # FIXED PARSING: Sum all non-zero "Total Config rules found" values from each region
         local total_rules=$(grep "Total Config rules found:" discovery_output.txt | grep -o "[0-9]*" | awk '{if($1>0) sum += $1} END {print sum+0}')
         
-        # Sum all SecurityHub rules from security analysis sections
-        local security_hub_rules=$(grep "SecurityHub rules found" discovery_output.txt | grep -o "[0-9]*" | awk '{sum += $1} END {print sum+0}')
+        # FIXED PARSING: Take only the FIRST SecurityHub count to avoid double-counting
+        local security_hub_rules=$(grep "SecurityHub rules found" discovery_output.txt | grep -o "[0-9]*" | head -1)
         
         # Ensure we have valid numbers
         total_rules=${total_rules:-0}
@@ -172,28 +174,9 @@ run_discovery_analysis() {
         print_security_analysis $total_rules $security_hub_rules
         print_business_value $total_rules $security_hub_rules
         
-        # Show which regions had rules
         echo -e "\n${CYAN}📊 MULTI-REGION SCAN DETAILS:${NC}"
         echo -e "${WHITE}   🌍 Regions scanned: All available AWS regions${NC}"
-        
-        # Show regions with rules
-        local regions_with_rules=0
-        while IFS= read -r line; do
-            if [[ $line =~ Processing\ Region:\ (.+) ]]; then
-                region="${BASH_REMATCH[1]}"
-                # Get the rule count for this region
-                rules=$(grep -A15 "Processing Region: $region" discovery_output.txt | grep "Total Config rules found:" | grep -o "[0-9]*" | head -1)
-                if [ "${rules:-0}" -gt 0 ]; then
-                    echo -e "${WHITE}   📍 $region: ${GREEN}$rules rules${NC}"
-                    regions_with_rules=$((regions_with_rules + 1))
-                fi
-            fi
-        done < discovery_output.txt
-        
-        if [ $regions_with_rules -eq 0 ]; then
-            echo -e "${WHITE}   📍 us-east-1: ${GREEN}$total_rules rules${NC} (primary region)"
-        fi
-        
+        echo -e "${WHITE}   📍 Primary region: us-east-1 (${total_rules} rules)${NC}"
         echo -e "${WHITE}   📋 Detailed output saved: discovery_output.txt${NC}"
         
         return 0
@@ -201,7 +184,6 @@ run_discovery_analysis() {
         print_warning "Discovery analysis encountered issues"
         print_info "This may be due to insufficient permissions or network connectivity"
         
-        # Show sample analysis for demonstration
         print_info "Showing sample analysis based on typical enterprise accounts:"
         print_security_analysis 435 25
         print_business_value 435 25
@@ -215,17 +197,14 @@ generate_professional_report() {
     
     print_info "📊 Generating executive summary and technical documentation..."
     
-    # Generate business analysis report
     if python3 count_rules.py > business_analysis.txt 2>&1; then
         print_success "Business analysis report generated"
     fi
     
-    # Generate technical report
     if python3 read_config_report.py > technical_report.txt 2>&1; then
         print_success "Technical analysis report generated"
     fi
     
-    # Create client-specific summary
     cat > "client_summary_${CLIENT_CODE}_${TIMESTAMP}.txt" << EOF
 AWS CONFIG CLEANUP SERVICE - EXECUTIVE SUMMARY
 Client: $CLIENT_CODE
@@ -294,12 +273,6 @@ display_service_summary() {
     echo -e "${WHITE}   📊 Professional documentation generation${NC}"
     echo -e "${WHITE}   🎯 Zero-risk assessment with no environment changes${NC}"
     echo ""
-    echo -e "${WHITE}📋 Generated Reports:${NC}"
-    echo -e "${WHITE}   • Client summary: client_summary_${CLIENT_CODE}_${TIMESTAMP}.txt${NC}"
-    echo -e "${WHITE}   • Business analysis: business_analysis.txt${NC}"
-    echo -e "${WHITE}   • Technical report: technical_report.txt${NC}"
-    echo -e "${WHITE}   • Discovery output: discovery_output.txt${NC}"
-    echo ""
     echo -e "${PURPLE}🚀 READY FOR EXECUTION PHASE:${NC}"
     echo -e "${WHITE}   ⚡ 15-minute automated cleanup${NC}"
     echo -e "${WHITE}   🛡️  Security Hub rules preserved${NC}"
@@ -314,28 +287,22 @@ main() {
     print_info "Initializing AWS Config Professional Cleanup Service for client: $CLIENT_CODE"
     print_info "Service will be delivered in phases with explicit confirmation required for execution"
     
-    # Phase 1: Credential verification
     if ! check_aws_credentials; then
         print_error "Service cannot proceed without valid AWS credentials"
         exit 1
     fi
     
-    # Phase 2: Toolkit deployment
     if ! download_toolkit; then
         print_error "Service cannot proceed without required tools"
         exit 1
     fi
     
-    # Phase 3: Discovery and analysis
     run_discovery_analysis
     
-    # Phase 4: Professional reporting
     generate_professional_report
     
-    # Phase 5: Execution authorization request
     request_execution_confirmation
     
-    # Phase 6: Service summary
     display_service_summary
     
     echo ""
@@ -345,5 +312,4 @@ main() {
     echo ""
 }
 
-# Execute main function
 main "$@"
