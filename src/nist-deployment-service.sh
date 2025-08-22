@@ -1,5 +1,5 @@
 #!/bin/bash
-# NIST 800-171 Deployment Service
+# NIST 800-171 Deployment Service - Updated with Stack Management
 # Professional CloudFormation deployment for NIST compliance
 # Contact: khalillyons@gmail.com | (703) 795-4193
 
@@ -20,7 +20,7 @@ echo "Service Date: $(date)"
 echo "Service Provider: AWS Config Cleanup Service"
 echo ""
 
-# Download NIST CloudFormation template - FIXED PATH
+# Download the NIST template
 echo "📥 Downloading NIST 800-171 CloudFormation template..."
 curl -s -O https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/templates/nist-800-171-conformance-pack.yaml
 
@@ -32,12 +32,11 @@ fi
 echo "✅ NIST 800-171 template ready for deployment"
 echo ""
 
-# Pre-deployment validation
+# Phase 1: Pre-deployment validation
 echo "🔍 Phase 1: Pre-deployment Validation"
 echo "   Validating CloudFormation template..."
 
-aws cloudformation validate-template \
-    --template-body file://nist-800-171-conformance-pack.yaml > /dev/null 2>&1
+aws cloudformation validate-template --template-body file://nist-800-171-conformance-pack.yaml > /dev/null 2>&1
 
 if [ $? -eq 0 ]; then
     echo "✅ CloudFormation template is valid"
@@ -46,24 +45,65 @@ else
     exit 1
 fi
 
-# Check if Config is enabled
 echo "   Checking AWS Config service status..."
-aws configservice describe-configuration-recorders --query 'ConfigurationRecorders[0].recordingGroup.allSupported' --output text > /dev/null 2>&1
+aws configservice describe-configuration-recorders > /dev/null 2>&1
 
 if [ $? -eq 0 ]; then
     echo "✅ AWS Config service is properly configured"
 else
-    echo "⚠️  AWS Config may need configuration"
+    echo "❌ AWS Config service not configured"
+    exit 1
+fi
+
+# NEW: Check if stack already exists
+echo "   Checking for existing stack..."
+STACK_EXISTS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME 2>/dev/null)
+
+if [ $? -eq 0 ]; then
+    echo "⚠️  Stack '$STACK_NAME' already exists!"
+    
+    STACK_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].StackStatus' --output text)
+    echo "   Current status: $STACK_STATUS"
+    echo ""
+    echo "📋 Options:"
+    echo "   1. UPDATE - Update existing stack with latest template"
+    echo "   2. DELETE - Delete existing stack and create new one"
+    echo "   3. CANCEL - Cancel deployment and exit"
+    echo ""
+    
+    read -p "   Choose option (UPDATE/DELETE/CANCEL): " stack_action
+    
+    case $stack_action in
+        UPDATE)
+            echo "   Selected: Update existing stack"
+            DEPLOYMENT_TYPE="update"
+            ;;
+        DELETE)
+            echo "   Selected: Delete and recreate stack"
+            DEPLOYMENT_TYPE="recreate"
+            ;;
+        CANCEL)
+            echo "❌ NIST deployment cancelled by client"
+            exit 1
+            ;;
+        *)
+            echo "❌ Invalid option selected"
+            exit 1
+            ;;
+    esac
+else
+    echo "✅ No existing stack found - ready for new deployment"
+    DEPLOYMENT_TYPE="create"
 fi
 
 echo ""
-
-# Deployment confirmation
 echo "⚠️  READY FOR NIST 800-171 DEPLOYMENT"
 echo "   This will deploy 100+ Config rules for NIST compliance"
 echo "   Stack Name: $STACK_NAME"
 echo "   Template: nist-800-171-conformance-pack.yaml"
+echo "   Action: $DEPLOYMENT_TYPE"
 echo ""
+
 read -p "   Continue with NIST deployment? (type 'DEPLOY'): " confirmation
 
 if [ "$confirmation" != "DEPLOY" ]; then
@@ -73,104 +113,147 @@ fi
 
 echo ""
 echo "🚀 Phase 2: NIST 800-171 Deployment (5-10 minutes)"
-echo "   Deploying CloudFormation stack: $STACK_NAME"
+echo "   Deployment type: $DEPLOYMENT_TYPE"
+echo "   Start time: $(date)"
 
-start_time=$(date +%s)
-
-# Deploy the stack
-aws cloudformation create-stack \
-    --stack-name "$STACK_NAME" \
-    --template-body file://nist-800-171-conformance-pack.yaml \
-    --capabilities CAPABILITY_IAM \
-    --tags Key=Service,Value="NIST-800-171-Deployment" \
-           Key=Client,Value="$CLIENT_CODE" \
-           Key=Provider,Value="AWS-Config-Cleanup-Service"
-
-if [ $? -eq 0 ]; then
-    echo "✅ CloudFormation stack deployment initiated"
-    echo "   Monitoring deployment progress..."
-    
-    # Wait for stack creation to complete
-    aws cloudformation wait stack-create-complete --stack-name "$STACK_NAME"
-    
-    if [ $? -eq 0 ]; then
-        end_time=$(date +%s)
-        deployment_time=$((end_time - start_time))
+# Execute deployment based on type
+case $DEPLOYMENT_TYPE in
+    update)
+        echo "   Updating CloudFormation stack: $STACK_NAME"
+        aws cloudformation update-stack \
+            --stack-name $STACK_NAME \
+            --template-body file://nist-800-171-conformance-pack.yaml \
+            --capabilities CAPABILITY_IAM
         
-        echo "✅ NIST 800-171 deployment completed successfully!"
-        echo "   Deployment time: ${deployment_time} seconds"
-    else
-        echo "❌ CloudFormation stack deployment failed"
-        echo "   Check AWS Console for detailed error information"
-        exit 1
-    fi
+        if [ $? -eq 0 ]; then
+            echo "✅ CloudFormation stack update initiated"
+        else
+            echo "❌ Failed to update CloudFormation stack"
+            exit 1
+        fi
+        ;;
+        
+    recreate)
+        echo "   Deleting existing CloudFormation stack: $STACK_NAME"
+        aws cloudformation delete-stack --stack-name $STACK_NAME
+        
+        echo "   Waiting for stack deletion to complete..."
+        aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME
+        
+        if [ $? -eq 0 ]; then
+            echo "✅ Existing stack deleted successfully"
+        else
+            echo "❌ Failed to delete existing stack"
+            exit 1
+        fi
+        
+        echo "   Creating new CloudFormation stack: $STACK_NAME"
+        aws cloudformation create-stack \
+            --stack-name $STACK_NAME \
+            --template-body file://nist-800-171-conformance-pack.yaml \
+            --capabilities CAPABILITY_IAM
+        
+        if [ $? -eq 0 ]; then
+            echo "✅ CloudFormation stack creation initiated"
+        else
+            echo "❌ Failed to create CloudFormation stack"
+            exit 1
+        fi
+        ;;
+        
+    create)
+        echo "   Creating CloudFormation stack: $STACK_NAME"
+        aws cloudformation create-stack \
+            --stack-name $STACK_NAME \
+            --template-body file://nist-800-171-conformance-pack.yaml \
+            --capabilities CAPABILITY_IAM
+        
+        if [ $? -eq 0 ]; then
+            echo "✅ CloudFormation stack creation initiated"
+        else
+            echo "❌ Failed to create CloudFormation stack"
+            exit 1
+        fi
+        ;;
+esac
+
+# Wait for deployment completion
+echo "   Monitoring deployment progress..."
+if [ "$DEPLOYMENT_TYPE" = "update" ]; then
+    aws cloudformation wait stack-update-complete --stack-name $STACK_NAME
 else
-    echo "❌ Failed to initiate CloudFormation deployment"
+    aws cloudformation wait stack-create-complete --stack-name $STACK_NAME
+fi
+
+WAIT_RESULT=$?
+COMPLETION_TIME=$(date)
+
+if [ $WAIT_RESULT -eq 0 ]; then
+    echo "✅ NIST 800-171 deployment completed successfully!"
+    echo "   Completion time: $COMPLETION_TIME"
+else
+    echo "❌ NIST 800-171 deployment failed or timed out"
+    echo "📞 Contact support: khalillyons@gmail.com | (703) 795-4193"
     exit 1
 fi
 
+# Post-deployment validation
 echo ""
 echo "📊 Phase 3: Post-deployment Validation"
 
-# Count deployed Config rules
-rule_count=$(aws configservice describe-config-rules --query 'length(ConfigRules)' --output text)
-echo "   Config rules deployed: $rule_count"
+CONFIG_RULES_COUNT=$(aws configservice describe-config-rules --query 'length(ConfigRules)' --output text)
+echo "   Config rules deployed: $CONFIG_RULES_COUNT"
 
-# Check stack resources
-resource_count=$(aws cloudformation describe-stack-resources --stack-name "$STACK_NAME" --query 'length(StackResources)' --output text)
-echo "   CloudFormation resources: $resource_count"
+STACK_RESOURCES=$(aws cloudformation describe-stack-resources --stack-name $STACK_NAME --query 'length(StackResources)' --output text)
+echo "   CloudFormation resources: $STACK_RESOURCES"
 
+# Generate documentation
 echo ""
 echo "📄 Phase 4: Documentation Generation"
 
-# Generate deployment summary
 cat > "NIST_${CLIENT_CODE}_Deployment_Summary.txt" << EOF
-NIST 800-171 DEPLOYMENT SUMMARY
-===============================
+NIST 800-171 DEPLOYMENT SERVICE - COMPLETION SUMMARY
+===================================================
 
+CLIENT INFORMATION
+------------------
 Client Code: $CLIENT_CODE
 Stack Name: $STACK_NAME
-Deployment Date: $(date)
+Service Date: $(date +"%Y-%m-%d")
+Deployment Type: $DEPLOYMENT_TYPE
 Service Provider: AWS Config Cleanup Service
+Contact: khalillyons@gmail.com | (703) 795-4193
 
 DEPLOYMENT RESULTS
 ------------------
-✅ CloudFormation Stack: Successfully deployed
-✅ Config Rules: $rule_count rules active
-✅ Stack Resources: $resource_count resources created
-✅ Deployment Time: ${deployment_time} seconds
+• CloudFormation Stack: $STACK_NAME (active)
+• Config Rules Deployed: $CONFIG_RULES_COUNT
+• CloudFormation Resources: $STACK_RESOURCES
+• Deployment Duration: $COMPLETION_TIME
 
 NIST 800-171 COMPLIANCE STATUS
-------------------------------
-🏛️ Security Controls: Implemented across all AWS services
-🔒 Encryption: Enforced for data at rest and in transit  
-🔐 Access Control: IAM policies and MFA requirements active
-📊 Monitoring: Continuous compliance monitoring enabled
-📋 Audit Trail: CloudTrail and logging requirements met
+-----------------------------
+✅ NIST compliance framework deployed
+✅ 100+ Config rules monitoring compliance
+✅ Continuous compliance monitoring active
+✅ Professional compliance documentation generated
+
+BILLING INFORMATION
+-------------------
+Service: NIST 800-171 Compliance Deployment
+Investment: \$7,500
 
 NEXT STEPS
 ----------
-1. Initial compliance scan (24-48 hours for full results)
-2. Address any non-compliant resources identified
-3. Schedule monthly compliance reviews
-4. Implement ongoing monitoring and alerting
+• Initial compliance scan in progress (results in 24-48 hours)
+• Monthly compliance reports available
+• Ongoing monitoring and support available
 
-ONGOING SERVICES AVAILABLE
---------------------------
-• Monthly Compliance Reports: \$500/month
-• Quarterly Security Reviews: \$1,000/quarter  
-• Violation Remediation: \$200/hour
-• Annual Compliance Certification: \$2,500
-
-SUPPORT CONTACT
----------------
-Service Provider: AWS Config Cleanup Service
+SUPPORT
+-------
 Email: khalillyons@gmail.com
 Phone: (703) 795-4193
-Business Hours: 24/7 for deployment support
-
-Generated by NIST 800-171 Deployment Service
-$(date)
+Service completed: $(date)
 EOF
 
 echo "✅ Client documentation generated: NIST_${CLIENT_CODE}_Deployment_Summary.txt"
@@ -182,7 +265,7 @@ echo ""
 echo "📄 Professional Deliverables:"
 echo "• NIST_${CLIENT_CODE}_Deployment_Summary.txt"
 echo "• CloudFormation stack: $STACK_NAME (active)"
-echo "• $rule_count Config rules monitoring compliance"
+echo "• $CONFIG_RULES_COUNT Config rules monitoring compliance"
 echo ""
 echo "📊 Compliance Status:"
 echo "• Initial scan in progress (results in 24-48 hours)"
