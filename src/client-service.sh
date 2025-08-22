@@ -1,5 +1,5 @@
 #!/bin/bash
-# Enhanced AWS Config Client Service - Professional Delivery Platform
+# Enhanced AWS Config Client Service - Professional Delivery Platform (FIXED MULTI-REGION PARSING)
 # Usage: curl -s https://raw.githubusercontent.com/Kinglyonz/aws-config-client-services/main/src/client-service.sh | bash CLIENT_CODE
 
 # Professional color scheme
@@ -151,21 +151,70 @@ run_discovery_analysis() {
     print_info "🔍 Scanning all AWS regions for Config rules..."
     print_info "   This analysis is completely safe - no changes will be made"
     
-    # Run discovery with enhanced output
+    # Run discovery with enhanced output - ALWAYS scan ALL REGIONS
     if python3 aws_config_reset.py --all-regions --dry-run > discovery_output.txt 2>&1; then
         print_success "Discovery analysis completed successfully"
         
-        # Parse results for business analysis
-        local total_rules=$(grep -o "Total.*rules" discovery_output.txt | grep -o "[0-9]*" | head -1)
-        local security_hub_rules=$(grep -o "SecurityHub.*rules" discovery_output.txt | grep -o "[0-9]*" | head -1)
+        # IMPROVED: Enhanced parsing for multi-region output
+        local total_rules=0
+        local security_hub_rules=0
         
-        # Default values if parsing fails
+        # Method 1: Look for summary totals (preferred)
+        local summary_total=$(grep -i "Total rules processed:" discovery_output.txt | grep -o "[0-9]*" | head -1)
+        local summary_security=$(grep -i "Security Hub rules preserved:" discovery_output.txt | grep -o "[0-9]*" | head -1)
+        
+        # Method 2: Look for business analysis section
+        if [ -z "$summary_total" ]; then
+            summary_total=$(grep -i "Total Config rules found:" discovery_output.txt | grep -o "[0-9]*" | head -1)
+        fi
+        
+        if [ -z "$summary_security" ]; then
+            summary_security=$(grep -i "SecurityHub rules found" discovery_output.txt | grep -o "[0-9]*" | head -1)
+        fi
+        
+        # Method 3: Parse the security analysis sections for each region and sum them
+        if [ -z "$summary_total" ] || [ -z "$summary_security" ]; then
+            print_info "🔄 Parsing multi-region output for detailed analysis..."
+            
+            # Count SecurityHub rules across all regions
+            security_hub_rules=$(grep -o "SECURITY ANALYSIS: [0-9]* SecurityHub rules" discovery_output.txt | grep -o "[0-9]*" | awk '{sum += $1} END {print sum}')
+            
+            # Count total rules by looking for business analysis sections
+            total_rules=$(grep -o "Total Config rules found: [0-9]*" discovery_output.txt | grep -o "[0-9]*" | awk '{sum += $1} END {print sum}')
+            
+            # If still empty, try alternative patterns
+            if [ -z "$total_rules" ] || [ "$total_rules" = "0" ]; then
+                total_rules=$(grep -c "securityhub-" discovery_output.txt)
+            fi
+            
+            if [ -z "$security_hub_rules" ] || [ "$security_hub_rules" = "0" ]; then
+                security_hub_rules=$total_rules  # If we only found securityhub rules, they're all security hub
+            fi
+        else
+            total_rules=$summary_total
+            security_hub_rules=$summary_security
+        fi
+        
+        # Ensure we have valid numbers
         total_rules=${total_rules:-0}
         security_hub_rules=${security_hub_rules:-0}
+        
+        # Additional validation - count actual rule names in output
+        if [ "$total_rules" = "0" ]; then
+            print_info "🔍 Performing detailed rule count from output..."
+            total_rules=$(grep -o "securityhub-[a-zA-Z0-9-]*" discovery_output.txt | sort -u | wc -l)
+            security_hub_rules=$total_rules
+        fi
         
         # Display analysis results
         print_security_analysis $total_rules $security_hub_rules
         print_business_value $total_rules $security_hub_rules
+        
+        # Debug info for troubleshooting
+        echo -e "\n${CYAN}📊 MULTI-REGION SCAN SUMMARY:${NC}"
+        echo -e "${WHITE}   🌍 Regions scanned: All available AWS regions${NC}"
+        echo -e "${WHITE}   📋 Raw output saved: discovery_output.txt${NC}"
+        echo -e "${WHITE}   🔍 Analysis method: Multi-region aggregation${NC}"
         
         return 0
     else
@@ -269,10 +318,12 @@ display_service_summary() {
     echo -e "${WHITE}   • Client summary: client_summary_${CLIENT_CODE}_${TIMESTAMP}.txt${NC}"
     echo -e "${WHITE}   • Business analysis: business_analysis.txt${NC}"
     echo -e "${WHITE}   • Technical report: technical_report.txt${NC}"
+    echo -e "${WHITE}   • Discovery output: discovery_output.txt${NC}"
     echo ""
     echo -e "${PURPLE}🚀 READY FOR EXECUTION PHASE:${NC}"
     echo -e "${WHITE}   ⚡ 15-minute automated cleanup${NC}"
     echo -e "${WHITE}   🛡️  Security Hub rules preserved${NC}"
+    echo -e "${WHITE}   🌍 All regions processed${NC}"
     echo -e "${WHITE}   📋 Professional documentation included${NC}"
     echo -e "${WHITE}   💎 Immediate cost savings realization${NC}"
 }
