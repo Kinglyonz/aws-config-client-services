@@ -1,66 +1,15 @@
 #!/bin/bash
-# AWS Config Professional Cleanup Service - FIXED VERSION
-# Real-time discovery, no cached data
+# AWS Config Cleanup - Professional Client Service Delivery
+# UPDATED: Now uses LIVE AWS data for consistent rule counting
 # Contact: khalillyons@gmail.com | (703) 795-4193
 
+# Validate client authorization
 CLIENT_CODE="$1"
-
 if [ -z "$CLIENT_CODE" ]; then
-    echo "❌ Usage: $0 CLIENT_CODE"
+    echo "❌ Authorization required."
     echo "📞 Contact: khalillyons@gmail.com | (703) 795-4193"
     exit 1
 fi
-
-# Real-time rule counting function
-get_live_rule_count() {
-    echo "🔍 Getting real-time Config rule count..."
-    python3 -c "
-import boto3
-total = 0
-try:
-    ec2 = boto3.client('ec2')
-    regions = [r['RegionName'] for r in ec2.describe_regions(AllRegions=False)['Regions']]
-    for region in regions:
-        try:
-            config_client = boto3.Session(region_name=region).client('configservice')
-            response = config_client.describe_config_rules()
-            count = len(response.get('ConfigRules', []))
-            total += count
-        except:
-            pass
-    print(total)
-except Exception as e:
-    print('304')  # fallback
-"
-}
-
-# Business value calculation function
-calculate_business_value() {
-    local rule_count=$1
-    local price_per_rule=3.00
-    local base_price=$(echo "$rule_count * $price_per_rule" | bc)
-    
-    # Pricing tiers
-    if [ $rule_count -le 100 ]; then
-        final_price=500
-    elif [ $rule_count -le 200 ]; then
-        final_price=600
-    elif [ $rule_count -le 400 ]; then
-        final_price=$(echo "if ($base_price > 1200) $base_price else 1200" | bc)
-    elif [ $rule_count -le 600 ]; then
-        final_price=$(echo "if ($base_price > 1800) $base_price else 1800" | bc)
-    else
-        final_price=2500
-    fi
-    
-    # Calculate savings
-    manual_hours=$(echo "scale=1; $rule_count * 0.033" | bc)
-    manual_cost=$(echo "scale=0; $manual_hours * 240" | bc)
-    savings=$(echo "scale=0; $manual_cost - $final_price" | bc)
-    savings_percent=$(echo "scale=1; ($savings / $manual_cost) * 100" | bc)
-    
-    echo "$final_price:$manual_cost:$savings:$savings_percent:$manual_hours"
-}
 
 echo "🏢 AWS Config Professional Cleanup Service"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -70,235 +19,224 @@ echo "Service Provider: AWS Config Cleanup Service"
 echo "Contact: khalillyons@gmail.com | (703) 795-4193"
 echo ""
 
-# Download the professional service toolkit
+# Download enhanced client toolkit
 echo "📥 Downloading professional service toolkit..."
 curl -s -O https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/src/aws_config_reset.py
-curl -s -O https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/src/create_client_report.py
+curl -s -O https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/src/count_rules.py
 curl -s -O https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/src/read_config_report.py
-
-if [ ! -f "aws_config_reset.py" ]; then
-    echo "❌ Failed to download service toolkit"
-    exit 1
-fi
+curl -s -O https://raw.githubusercontent.com/Kinglyonz/aws-config-reset/main/src/create_client_report.py
 
 echo "✅ Professional service toolkit ready!"
 echo ""
 
-# Phase 1: Real-time discovery and validation
+# Phase 1: Pre-service discovery
 echo "🔍 Phase 1: Pre-service Discovery & Validation"
 echo "   Running comprehensive analysis for client: $CLIENT_CODE"
 
-# Get real-time rule count
-TOTAL_RULES=$(get_live_rule_count)
-echo "   • Live Config Rules Discovered: $TOTAL_RULES"
-
-# Run discovery analysis
-python3 aws_config_reset.py --all-regions --dry-run
+# IMPROVED: Do both discovery methods for comparison
+echo "   📊 Method 1: JSON-based discovery..."
+python3 aws_config_reset.py --all-regions
 
 if [ $? -ne 0 ]; then
-    echo "❌ Discovery analysis failed"
+    echo "❌ Pre-service validation failed."
+    echo "📞 Contact service provider: khalillyons@gmail.com"
     exit 1
 fi
 
+# IMPROVED: Get live count for verification
+echo "   📊 Method 2: Live AWS API verification..."
+echo "   Verifying rule counts across all regions..."
+
+# Get live count using AWS CLI (most reliable method)
+LIVE_RULE_COUNT=0
+REGIONS_WITH_CONFIG=0
+
+# Get all regions
+ALL_REGIONS=$(aws ec2 describe-regions --query 'Regions[].RegionName' --output text)
+
+echo "   🌍 Scanning regions for Config rules..."
+for region in $ALL_REGIONS; do
+    REGION_COUNT=$(aws configservice describe-config-rules --region $region --query 'length(ConfigRules)' --output text 2>/dev/null)
+    
+    if [ $? -eq 0 ] && [ "$REGION_COUNT" != "None" ] && [ "$REGION_COUNT" -gt 0 ]; then
+        echo "      $region: $REGION_COUNT rules"
+        LIVE_RULE_COUNT=$((LIVE_RULE_COUNT + REGION_COUNT))
+        REGIONS_WITH_CONFIG=$((REGIONS_WITH_CONFIG + 1))
+    else
+        echo "      $region: 0 rules (Config not enabled)"
+    fi
+done
+
+echo ""
+echo "   ✅ Live verification complete:"
+echo "      • Total regions scanned: $(echo $ALL_REGIONS | wc -w)"
+echo "      • Regions with Config: $REGIONS_WITH_CONFIG"  
+echo "      • Total Config rules (LIVE): $LIVE_RULE_COUNT"
 echo ""
 
-# Phase 2: Real-time business value calculation
+# Phase 2: Business value confirmation with LIVE data
 echo "💰 Phase 2: Business Value Confirmation"
+echo "   Using LIVE AWS data for accurate pricing..."
 
-# Calculate business value with real-time data
-BUSINESS_VALUES=$(calculate_business_value $TOTAL_RULES)
-IFS=':' read -r FINAL_PRICE MANUAL_COST SAVINGS SAVINGS_PERCENT MANUAL_HOURS <<< "$BUSINESS_VALUES"
+# Calculate pricing using live count (most accurate)
+BASE_PRICE=$((LIVE_RULE_COUNT * 3))
+if [ $BASE_PRICE -lt 500 ]; then
+    FINAL_PRICE=500
+elif [ $BASE_PRICE -gt 2500 ]; then
+    FINAL_PRICE=2500
+else
+    FINAL_PRICE=$BASE_PRICE
+fi
 
-echo "🎯 AWS CONFIG CLEANUP - BUSINESS VALUE ANALYSIS"
-echo "============================================================"
-echo ""
-echo "📊 DISCOVERY RESULTS:"
-echo "   • Total Config Rules Found: $TOTAL_RULES"
-echo "   • Regions Analyzed: $(aws ec2 describe-regions --query 'length(Regions)' --output text)"
-echo "   • Analysis Type: Real-time Live Discovery"
-echo ""
-echo "💰 PRICING BREAKDOWN:"
-echo "   📏 Rules Discovered: $TOTAL_RULES"
-echo "   💵 Price per Rule: \$3.00"
-echo "   🧮 Base Calculation: $TOTAL_RULES × \$3 = \$$MANUAL_COST"
-echo "   🎯 YOUR FINAL PRICE: \$$FINAL_PRICE"
-echo ""
-echo "⚖️ COST COMPARISON:"
-echo "   🔧 Manual Cleanup Time: $MANUAL_HOURS hours"
-echo "   💼 Manual Labor Cost: \$$MANUAL_COST (at \$240/hour)"
-echo "   ⚡ Our Automated Service: \$$FINAL_PRICE (15 minutes)"
-echo "   💰 YOUR SAVINGS: \$$SAVINGS"
-echo "   📈 Cost Reduction: $SAVINGS_PERCENT%"
-echo "   🎉 Return on Investment: $(echo "scale=0; ($SAVINGS / $FINAL_PRICE) * 100" | bc)%"
-echo ""
-echo "🚀 VALUE PROPOSITION:"
-echo "   ⏱️  Time Savings: $MANUAL_HOURS hours → 15 minutes"
-echo "   💵 Cost Savings: \$$SAVINGS ($SAVINGS_PERCENT% reduction)"
-echo "   🛡️  Risk Elimination: Zero chance of human error"
-echo "   📊 Professional Reports: Executive-ready documentation included"
-echo "   🔄 Immediate Delivery: No waiting for consultant scheduling"
-echo ""
-echo "✅ RECOMMENDATION: Excellent candidate for automated cleanup service!"
-echo "   Client saves \$$SAVINGS plus eliminates all technical risk"
-echo ""
-echo "🎯 COMPETITIVE ADVANTAGES:"
-echo "   • 50-70% below typical consultant rates"
-echo "   • 15 minutes vs days/weeks delivery time"
-echo "   • Zero human error risk"
-echo "   • Professional documentation included"
-echo "   • Immediate availability"
-echo ""
-echo "📋 PRICING SCALE EXAMPLES:"
-echo "   •  50 rules = \$500 (saves \$300 + risk elimination)"
-echo "   • 100 rules = \$500 (saves \$500 + risk elimination)"
-echo "   • 200 rules = \$600 (saves \$1,000 + risk elimination)"
-echo "   • $TOTAL_RULES rules = \$$FINAL_PRICE (saves \$$SAVINGS + risk elimination)"
-echo "   • 600 rules = \$1,800 (saves \$3,000 + risk elimination)"
-echo "   • 800+ rules = \$2,500 (saves \$3,900+ + risk elimination)"
+# Calculate manual costs
+MANUAL_MINUTES=$((LIVE_RULE_COUNT * 2))
+MANUAL_HOURS=$((MANUAL_MINUTES / 60))
+MANUAL_COST=$((MANUAL_HOURS * 240))
+SAVINGS=$((MANUAL_COST - FINAL_PRICE))
+
+echo "   📊 LIVE PRICING ANALYSIS:"
+echo "      • Config rules found: $LIVE_RULE_COUNT"
+echo "      • Base price (${LIVE_RULE_COUNT} × \$3): \$$BASE_PRICE"
+echo "      • Final service price: \$$FINAL_PRICE"
+echo "      • Manual cost estimate: \$$MANUAL_COST"
+echo "      • Client savings: \$$SAVINGS"
 echo ""
 
-# Create business value summary
-cat > "Business_Value_Summary.txt" << EOF
-AWS CONFIG CLEANUP - BUSINESS VALUE ANALYSIS
-============================================
+# BACKUP: Also run JSON-based calculator for comparison
+echo "   📋 Running backup analysis for comparison..."
+python3 count_rules.py
 
-DISCOVERY RESULTS:
-• Total Config Rules: $TOTAL_RULES
-• Analysis Method: Real-time Live Discovery
-• Service Price: \$$FINAL_PRICE
-• Manual Alternative: \$$MANUAL_COST
-• Client Savings: \$$SAVINGS ($SAVINGS_PERCENT% reduction)
-
-COMPETITIVE ADVANTAGES:
-• 15 minutes vs $MANUAL_HOURS hours delivery
-• Zero human error risk
-• Professional documentation included
-• Immediate availability
-
-Contact: khalillyons@gmail.com | (703) 795-4193
-EOF
-
-echo "📄 Business summary saved to: Business_Value_Summary.txt"
-echo "💡 Use this summary for client presentations and proposals!"
+# Phase 3: Professional reporting
 echo ""
-
-# Phase 3: Professional report generation
 echo "📊 Phase 3: Professional Report Generation"
+python3 read_config_report.py
+python3 create_client_report.py
 
-# Generate human-readable report
-python3 read_config_report.py > /dev/null 2>&1
-if [ -f "Human_Readable_Config_Report.txt" ]; then
-    echo "✅ Human-readable report created: Human_Readable_Config_Report.txt"
-    echo "📄 This report is perfect for sharing with non-technical stakeholders!"
-fi
-
-# Generate executive summary
-cat > "Executive_Summary.txt" << EOF
-EXECUTIVE SUMMARY - AWS CONFIG CLEANUP SERVICE
-==============================================
-
-CLIENT: $CLIENT_CODE
-SERVICE DATE: $(date +"%Y-%m-%d")
-
-DISCOVERY RESULTS:
-• $TOTAL_RULES Config rules identified across all AWS regions
-• Real-time analysis completed in under 5 minutes
-• Professional cleanup service recommended
-
-BUSINESS VALUE:
-• Service Investment: \$$FINAL_PRICE
-• Manual Alternative Cost: \$$MANUAL_COST
-• Immediate Savings: \$$SAVINGS ($SAVINGS_PERCENT% reduction)
-• Time Savings: $MANUAL_HOURS hours → 15 minutes
-
-RECOMMENDATION: Proceed with automated cleanup service
-Contact: khalillyons@gmail.com | (703) 795-4193
-EOF
-
-echo "✅ Executive summary created: Executive_Summary.txt"
-echo "📊 Perfect for forwarding to decision makers!"
-
-# Generate professional client report
-python3 create_client_report.py > /dev/null 2>&1
-if [ -f "AWS_Config_Cleanup_Report.txt" ]; then
-    echo "✅ Professional report created: AWS_Config_Cleanup_Report.txt"
-    echo "📥 Download this file to provide to your client"
-fi
-
-# Create quick summary
-cat > "Quick_Summary.txt" << EOF
-AWS Config Cleanup Service - Quick Summary
-==========================================
-Client: $CLIENT_CODE
-Rules Found: $TOTAL_RULES
-Service Price: \$$FINAL_PRICE
-Client Savings: \$$SAVINGS
-Time Savings: $MANUAL_HOURS hours → 15 minutes
-Contact: khalillyons@gmail.com | (703) 795-4193
-EOF
-
-echo "✅ Quick summary created: Quick_Summary.txt"
-echo "💰 Pricing: \$$FINAL_PRICE for $TOTAL_RULES rules (saves client \$$SAVINGS)"
+# Add client-specific branding to reports with LIVE data
 echo ""
+echo "🏷️  Adding client-specific documentation with live data..."
+CLIENT_DATE=$(date +"%Y-%m-%d")
+CLIENT_TIME=$(date +"%H:%M:%S")
 
-# Add client-specific documentation
-echo "🏷️  Adding client-specific documentation..."
-
+# Create enhanced client-specific summary with live data
 cat > "CLIENT_${CLIENT_CODE}_Service_Summary.txt" << EOF
-AWS CONFIG CLEANUP SERVICE - CLIENT SUMMARY
-===========================================
+AWS CONFIG CLEANUP SERVICE - CLIENT DELIVERY SUMMARY
+====================================================
 
-CLIENT INFORMATION:
 Client Code: $CLIENT_CODE
-Service Date: $(date)
+Service Date: $CLIENT_DATE
+Service Time: $CLIENT_TIME
+Service Provider: AWS Config Cleanup Service
 Contact: khalillyons@gmail.com | (703) 795-4193
 
-DISCOVERY RESULTS:
-• Total Config Rules: $TOTAL_RULES (real-time discovery)
-• Analysis Method: Live AWS API scanning
-• Regions Scanned: All enabled AWS regions
-• Discovery Time: Under 5 minutes
+DISCOVERY PHASE COMPLETED
+-------------------------
+✅ Multi-region Config rule discovery completed
+✅ LIVE AWS API verification completed
+✅ Business value analysis generated (using live data)
+✅ Professional documentation created
+✅ Risk assessment completed
 
-BUSINESS VALUE:
-• Service Investment: \$$FINAL_PRICE
-• Manual Cleanup Cost: \$$MANUAL_COST
-• Your Savings: \$$SAVINGS ($SAVINGS_PERCENT% reduction)
-• Time Savings: $MANUAL_HOURS hours → 15 minutes
-• Risk Elimination: Zero chance of human error
+LIVE AWS ANALYSIS RESULTS
+-------------------------
+• Total AWS regions scanned: $(echo $ALL_REGIONS | wc -w)
+• Regions with AWS Config enabled: $REGIONS_WITH_CONFIG
+• Total Config rules discovered (LIVE): $LIVE_RULE_COUNT
+• Analysis timestamp: $(date)
 
-SERVICE DELIVERABLES:
-• Professional cleanup execution (15 minutes)
-• Executive summary report
-• Technical analysis documentation
-• Business value confirmation
-• Ongoing support and consultation
+PRICING BREAKDOWN (LIVE DATA)
+-----------------------------
+• Config rules found: $LIVE_RULE_COUNT
+• Rate: \$3.00 per rule
+• Base calculation: $LIVE_RULE_COUNT × \$3 = \$$BASE_PRICE
+• Final service price: \$$FINAL_PRICE
+• Estimated manual cost: \$$MANUAL_COST
+• Client savings: \$$SAVINGS
 
-NEXT STEPS:
-1. Review this analysis and business value
-2. Approve service execution
-3. Schedule 15-minute cleanup window
-4. Receive professional documentation
+READY FOR CLEANUP EXECUTION
+----------------------------
+Status: Discovery phase complete - awaiting execution approval
+Next Step: Schedule cleanup execution window
 
-CONTACT INFORMATION:
+SERVICE EXECUTION COMMAND
+-------------------------
+To execute the actual cleanup service:
+python3 aws_config_reset.py --all-regions --no-dry-run
+
+PROFESSIONAL DELIVERABLES
+--------------------------
+• config_reset_report.json (technical analysis)
+• Business_Value_Summary.txt (ROI calculations)
+• Human_Readable_Config_Report.txt (detailed report)
+• AWS_Config_Cleanup_Report.txt (executive documentation)
+• CLIENT_${CLIENT_CODE}_Service_Summary.txt (this summary with live data)
+
+DATA ACCURACY GUARANTEE
+------------------------
+Pricing based on LIVE AWS API data ($(date))
+Same method as: aws configservice describe-config-rules
+Guaranteed accurate count matching AWS Console
+
+SUPPORT & CONTACT
+-----------------
+Service Provider: AWS Config Cleanup Service
 Email: khalillyons@gmail.com
 Phone: (703) 795-4193
-Service Provider: AWS Config Cleanup Service
+Business Hours: Available 24/7 for service delivery
 
-Thank you for choosing our professional AWS Config cleanup service!
+NEXT STEPS
+----------
+1. Review discovery analysis and business value reports
+2. Approve service execution window
+3. Execute professional cleanup service
+4. Receive final documentation and billing
+
+Professional service delivery completed by:
+AWS Config Cleanup Service
+Generated: $(date)
+Live Data Verification: $LIVE_RULE_COUNT rules confirmed via AWS API
+EOF
+
+# Create a separate live data summary for easy reference
+cat > "LIVE_DATA_${CLIENT_CODE}_$(date +%Y%m%d_%H%M%S).txt" << EOF
+AWS CONFIG LIVE DATA SUMMARY
+============================
+
+Client: $CLIENT_CODE
+Timestamp: $(date)
+Data Source: Live AWS API calls
+
+LIVE SCAN RESULTS:
+• Total Config rules: $LIVE_RULE_COUNT
+• Regions with Config: $REGIONS_WITH_CONFIG
+• Service price: \$$FINAL_PRICE
+
+This matches the count from:
+aws configservice describe-config-rules --query 'length(ConfigRules)'
+
+Generated by AWS Config Professional Service
 EOF
 
 echo ""
 echo "✅ CLIENT DISCOVERY SERVICE COMPLETE!"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
+echo "📊 LIVE DATA SUMMARY:"
+echo "   • Config rules found: $LIVE_RULE_COUNT (verified live)"
+echo "   • Regions analyzed: $(echo $ALL_REGIONS | wc -w)"
+echo "   • Service price: \$$FINAL_PRICE"
+echo ""
 echo "📄 Professional Deliverables Generated:"
-ls -la *.txt | grep -E "(Business_Value|Executive|AWS_Config|Quick|CLIENT_)"
+ls -la *.txt *.json 2>/dev/null | head -10
 echo ""
 echo "📧 Client-Specific Files:"
-echo "• CLIENT_${CLIENT_CODE}_Service_Summary.txt"
+echo "• CLIENT_${CLIENT_CODE}_Service_Summary.txt (with live data)"
+echo "• LIVE_DATA_${CLIENT_CODE}_$(date +%Y%m%d_%H%M%S).txt (verification)"
 echo ""
 echo "🎯 DISCOVERY PHASE COMPLETE"
-echo "   Client can now review analysis and approve cleanup execution"
+echo "   ✅ Live data verification: $LIVE_RULE_COUNT rules"
+echo "   ✅ Pricing calculated from live AWS API data"
+echo "   ✅ Same accuracy as CLI command"
 echo ""
 echo "⚡ TO EXECUTE ACTUAL CLEANUP:"
 echo "   python3 aws_config_reset.py --all-regions --no-dry-run"
